@@ -4,6 +4,19 @@ from config import settings
 from .errors import DatasetExistsError, DatasetDoesNotExistError
 from llama_index.vector_stores.postgres import PGVectorStore
 
+
+from llama_index.core import Document, get_response_synthesizer
+
+
+from llama_index.core.indices import VectorStoreIndex
+
+from llama_index.embeddings.openai import OpenAIEmbedding, OpenAIEmbeddingModelType
+
+from llama_index.core.retrievers import VectorIndexRetriever
+
+from llama_index.core.query_engine import RetrieverQueryEngine
+
+
 #
 # Database Connection
 #
@@ -62,7 +75,9 @@ def create_dataset(name: str, embed_dim: int = 1536):
             raise DatasetExistsError(name)
 
     # Initialize VectorStore for the dataset
-    get_vector_store(name, embed_dim=embed_dim)._initialize()
+    vector_store = get_vector_store(name, embed_dim=embed_dim)
+    if isinstance(vector_store, PGVectorStore):
+        vector_store._initialize()
 
 
 def delete_dataset(name: str):
@@ -89,3 +104,47 @@ def delete_dataset(name: str):
         # Drop the table
         c.execute(f"DROP TABLE {n}")
         dbconn.commit()
+
+
+def ingest_document(
+    dataset: str,
+    document: Document,
+    embed_model_name: str = OpenAIEmbeddingModelType.TEXT_EMBED_ADA_002,
+):
+    vector_store = get_vector_store(dataset)
+
+    embed_model = OpenAIEmbedding(
+        model=embed_model_name,
+        dimensions=vector_store.embed_dim,
+        # TODO: Set API parameters and allow for other embed_models to make it work with Rubra
+    )
+
+    vector_store_index = VectorStoreIndex.from_vector_store(
+        vector_store=vector_store, embed_model=embed_model
+    )
+
+    vector_store_index.insert(document)
+
+
+def query(
+    dataset: str,
+    prompt: str,
+    embed_model_name: str = OpenAIEmbeddingModelType.TEXT_EMBED_ADA_002,
+):
+    vector_store = get_vector_store(dataset)
+    embed_model = OpenAIEmbedding(
+        model=embed_model_name,
+    )
+
+    vector_store_index = VectorStoreIndex.from_vector_store(
+        vector_store=vector_store, embed_model=embed_model
+    )
+
+    retriever = VectorIndexRetriever(index=vector_store_index, embed_model=embed_model)
+
+    query_engine = RetrieverQueryEngine(
+        retriever=retriever,
+        response_synthesizer=get_response_synthesizer(),  # TODO: optimize response_mode
+    )
+
+    return str(query_engine.query(prompt))  # TODO: use pydantic response

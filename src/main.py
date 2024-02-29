@@ -5,6 +5,7 @@ from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.staticfiles import StaticFiles
 import db.main as db
 import db.errors as dberr
+import ingest.main as ingest
 
 
 app = FastAPI(title="Rubra - Knowledge Retrieval API")
@@ -95,7 +96,7 @@ async def delete_dataset(name: str):
 
 
 @app.post("/datasets/{name}/query")
-async def query_vector(name: str, query: str):
+async def query(name: str, query: str):
     """Query the VectorDB with a user-given prompt.
 
     Args:
@@ -109,14 +110,14 @@ async def query_vector(name: str, query: str):
         JSONResponse: Top-k results from the query
     """
     try:
-        # results = db.query(query.query_vector, k=query.k)
-        return {"results": "foo"}
+        results = db.query(prompt=query, dataset=name)
+        return {"results": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/datasets/{name}/ingest")
-async def ingest_data(input: Ingest):
+async def ingest_data(input_data: Ingest):
     """Ingest new data into the VectorDB.
 
     Args:
@@ -133,6 +134,7 @@ async def ingest_data(input: Ingest):
         # Convert base64 data to appropriate format and ingest into pgvector
         # You would need to implement the logic here based on your requirements
         # This could involve using OpenAI API for embedding and then storing in pgvector
+        ingest.ingest_document(input_data.filename, input_data.data)
         return {"message": "Data ingested successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
