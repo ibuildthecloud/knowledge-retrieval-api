@@ -6,17 +6,12 @@ from .errors import DatasetDoesNotExistError
 from .main import get_vector_store, vector_store_exists
 
 
-from llama_index.core import get_response_synthesizer
-
-
 from llama_index.core.indices import VectorStoreIndex
 
 from llama_index.embeddings.openai import OpenAIEmbedding, OpenAIEmbeddingModelType
 
-
 from llama_index.core.retrievers import VectorIndexRetriever
-
-from llama_index.core.query_engine import RetrieverQueryEngine
+from llama_index.core.query_engine import CitationQueryEngine
 
 
 class QueryResponseSourceNode(BaseModel):
@@ -37,7 +32,7 @@ def query(
     prompt: str,
     topk: int,
     embed_model_name: str = OpenAIEmbeddingModelType.TEXT_EMBED_ADA_002,
-):
+) -> QueryResponse | None:
     if not vector_store_exists(dataset):
         raise DatasetDoesNotExistError(dataset)
 
@@ -54,12 +49,15 @@ def query(
         index=vector_store_index, embed_model=embed_model, similarity_top_k=topk
     )
 
-    query_engine = RetrieverQueryEngine(
+    citation_query_engine = CitationQueryEngine.from_args(
+        index=vector_store_index,
         retriever=retriever,
-        response_synthesizer=get_response_synthesizer(),  # TODO: optimize response_mode
+        similarity_top_k=topk,
+        embed_model=embed_model,
+        citation_chunk_size=512,
     )
 
-    response = query_engine.query(prompt)
+    citation_response = citation_query_engine.query(prompt)
 
     sources: List[QueryResponseSourceNode] = [
         QueryResponseSourceNode(
@@ -69,7 +67,7 @@ def query(
             last_modified_date=node.metadata.get("last_modified_date", ""),
             document_title=node.metadata.get("document_title", ""),
         )
-        for node in response.source_nodes
+        for node in citation_response.source_nodes
     ]
 
-    return QueryResponse(response=str(response), sources=sources)
+    return QueryResponse(response=str(citation_response), sources=sources)
