@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.staticfiles import StaticFiles
 import db
@@ -33,8 +33,20 @@ class Ingest(BaseModel):
 # Endpoints
 #
 @app.get("/", include_in_schema=False)
-async def root() -> RedirectResponse:
-    return RedirectResponse(url="/docs")
+async def root() -> HTMLResponse:
+    return HTMLResponse(
+        content="""
+        <html>
+            <body>
+                <p align="center">
+                    <img src="/static/img/icon.png" />
+                </p>
+                <h1 align="center">Rubra - Knowledge Retrieval API</h1>
+                <p align="center">Visit <a href="/docs">/docs</a> for the API documentation</p>
+            </body>
+        </html>
+        """
+    )
 
 
 @app.get("/docs", include_in_schema=False)
@@ -45,6 +57,11 @@ async def swagger_ui_html():
         swagger_favicon_url="/static/img/favicon.ico",
         swagger_ui_parameters=app.swagger_ui_parameters,
     )
+
+
+@app.get("/favicon.io", include_in_schema=False)
+async def favicon() -> FileResponse:
+    return FileResponse(path="/static/img/favicon.ico")
 
 
 @app.post("/datasets/create")
