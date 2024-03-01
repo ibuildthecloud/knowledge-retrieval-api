@@ -52,7 +52,7 @@ curl -X 'POST' \
   -d '{
   "name": "llama2",
   "embed_dim": 0
-}
+}'
 
 # Run the GPTScript example
 gptscript examples/example.gpt
