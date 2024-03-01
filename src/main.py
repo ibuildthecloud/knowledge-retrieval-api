@@ -3,8 +3,7 @@ from pydantic import BaseModel
 from fastapi.responses import RedirectResponse
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.staticfiles import StaticFiles
-import db.main as db
-import db.errors as dberr
+import db
 import ingest.main as ingest
 
 
@@ -65,7 +64,7 @@ async def create_dataset(dataset: Dataset) -> Dataset:
     try:
         db.create_dataset(dataset.name)  # TODO: take embed_dim as input
         return Dataset(name=dataset.name, embed_dim=1536)
-    except dberr.DatasetExistsError as e:
+    except db.DatasetExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -89,7 +88,7 @@ async def delete_dataset(name: str):
     try:
         db.delete_dataset(name)
         return {"message": f"Dataset '{name}' deleted successfully"}
-    except dberr.DatasetDoesNotExistError as e:
+    except db.DatasetDoesNotExistError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -113,7 +112,7 @@ async def query(name: str, query: str, topk: int = 5):
     try:
         results = db.query(prompt=query, dataset=name, topk=topk)
         return {"results": results}
-    except dberr.DatasetDoesNotExistError as e:
+    except db.DatasetDoesNotExistError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -138,9 +137,7 @@ async def ingest_data(name: str, input_data: Ingest):
         # Convert base64 data to appropriate format and ingest into pgvector
         # You would need to implement the logic here based on your requirements
         # This could involve using OpenAI API for embedding and then storing in pgvector
-        ingested = await ingest.ingest_document(
-            name, input_data.filename, input_data.data
-        )
+        ingested = await ingest.ingest_file(name, input_data.filename, input_data.data)
         return {
             "message": (
                 "Successfully ingested data" + f" from file '{input_data.filename}'"
@@ -149,7 +146,7 @@ async def ingest_data(name: str, input_data: Ingest):
             ),
             "num_ingested_docs": ingested,
         }
-    except dberr.DatasetDoesNotExistError as e:
+    except db.DatasetDoesNotExistError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

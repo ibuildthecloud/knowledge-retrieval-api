@@ -4,10 +4,10 @@ import base64
 import tempfile
 import os
 
-import db.main as db
+from db import ingest_documents
 
 
-async def ingest_document(dataset: str, filename: str | None, content: str) -> int:
+async def ingest_file(dataset: str, filename: str | None, content: str) -> int:
     """Ingest a file into the VectorDB.
 
     Args:
@@ -38,7 +38,7 @@ async def ingest_document(dataset: str, filename: str | None, content: str) -> i
     documents = load_file(path)
 
     # Ingest documents: Create embeddings and store in the VectorDB
-    await db.ingest_documents(dataset, documents)
+    await ingest_documents(dataset, documents)
 
     # Cleanup
     os.remove(path)

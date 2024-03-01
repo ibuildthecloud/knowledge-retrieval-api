@@ -6,7 +6,7 @@ from .errors import DatasetExistsError, DatasetDoesNotExistError
 from llama_index.vector_stores.postgres import PGVectorStore
 
 
-from llama_index.core import Document, get_response_synthesizer
+from llama_index.core import Document
 
 from llama_index.core.text_splitter import TokenTextSplitter
 
@@ -19,10 +19,6 @@ from llama_index.core import set_global_service_context, ServiceContext
 from llama_index.embeddings.openai import OpenAIEmbedding, OpenAIEmbeddingModelType
 from llama_index.llms.openai import OpenAI
 
-
-from llama_index.core.retrievers import VectorIndexRetriever
-
-from llama_index.core.query_engine import RetrieverQueryEngine
 
 from llama_index.core.extractors import (
     SummaryExtractor,
@@ -173,37 +169,4 @@ async def ingest_documents(
         None, lambda: pipeline.run(documents=documents, show_progress=False)
     )
 
-    for node in nodes:
-        print(node.metadata)
-
     vector_store_index.insert_nodes(nodes)
-
-
-def query(
-    dataset: str,
-    prompt: str,
-    topk: int,
-    embed_model_name: str = OpenAIEmbeddingModelType.TEXT_EMBED_ADA_002,
-):
-    if not vector_store_exists(dataset):
-        raise DatasetDoesNotExistError(dataset)
-
-    vector_store = get_vector_store(dataset)
-    embed_model = OpenAIEmbedding(
-        model=embed_model_name,
-    )
-
-    vector_store_index = VectorStoreIndex.from_vector_store(
-        vector_store=vector_store, embed_model=embed_model
-    )
-
-    retriever = VectorIndexRetriever(
-        index=vector_store_index, embed_model=embed_model, similarity_top_k=topk
-    )
-
-    query_engine = RetrieverQueryEngine(
-        retriever=retriever,
-        response_synthesizer=get_response_synthesizer(),  # TODO: optimize response_mode
-    )
-
-    return str(query_engine.query(prompt))  # TODO: use pydantic response
