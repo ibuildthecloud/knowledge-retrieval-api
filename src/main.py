@@ -138,7 +138,9 @@ async def ingest_data(name: str, input_data: Ingest):
         # Convert base64 data to appropriate format and ingest into pgvector
         # You would need to implement the logic here based on your requirements
         # This could involve using OpenAI API for embedding and then storing in pgvector
-        ingested = ingest.ingest_document(name, input_data.filename, input_data.data)
+        ingested = await ingest.ingest_document(
+            name, input_data.filename, input_data.data
+        )
         return {
             "message": (
                 "Successfully ingested data" + f" from file '{input_data.filename}'"

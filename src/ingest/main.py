@@ -1,7 +1,5 @@
-from pathlib import Path
 from typing import List
 from llama_index.core import SimpleDirectoryReader, Document
-from llama_index.core.readers.file.base import default_file_metadata_func
 import base64
 import tempfile
 import os
@@ -9,7 +7,7 @@ import os
 import db.main as db
 
 
-def ingest_document(dataset: str, filename: str | None, content: str) -> int:
+async def ingest_document(dataset: str, filename: str | None, content: str) -> int:
     """Ingest a file into the VectorDB.
 
     Args:
@@ -40,7 +38,7 @@ def ingest_document(dataset: str, filename: str | None, content: str) -> int:
     documents = load_file(path)
 
     # Ingest documents: Create embeddings and store in the VectorDB
-    db.ingest_documents(dataset, documents)
+    await db.ingest_documents(dataset, documents)
 
     # Cleanup
     os.remove(path)
@@ -58,11 +56,4 @@ def load_file(path: str) -> List[Document]:
     Returns:
         Document: Document object
     """
-    return SimpleDirectoryReader.load_file(
-        input_file=Path(path),
-        file_metadata=default_file_metadata_func,
-        filename_as_id=True,
-        file_extractor={},
-        errors="ignore",
-        encoding="utf-8",
-    )
+    return SimpleDirectoryReader(input_files=[path]).load_data()
