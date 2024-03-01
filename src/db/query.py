@@ -20,6 +20,7 @@ class QueryResponseSourceNode(BaseModel):
     page: str
     last_modified_date: str
     document_title: str
+    content: str
 
 
 class QueryResponse(BaseModel):
@@ -66,8 +67,26 @@ def query(
             page=node.metadata.get("page_label", ""),
             last_modified_date=node.metadata.get("last_modified_date", ""),
             document_title=node.metadata.get("document_title", ""),
+            content=node.get_text(),
         )
         for node in citation_response.source_nodes
     ]
+
+    sources_txt = "\n".join(
+        [
+            f"[{source.filename}:: Page {source.page}] - {source.document_title}"
+            for source in sources
+        ]
+    )
+
+    print(
+        f"""
+            Response:
+            {citation_response}
+
+            Sources:
+            {sources_txt}
+          """
+    )
 
     return QueryResponse(response=str(citation_response), sources=sources)
