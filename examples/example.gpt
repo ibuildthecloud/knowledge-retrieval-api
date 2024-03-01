@@ -1,0 +1,26 @@
+tools: ingest, query, sys.abort, sys.read, sys.write, sys.exec
+
+Figure out what the LLama2 Paper located at ./examples/data/llama2.pdf says about "Truthfulness, Toxicity, and Bias" by
+first ingesting it into the vector DB and then querying the vector DB.
+Before ingesting, first check if the sha256sum appears on any line in the file ./examples/ingested.txt.
+If it does, skip ingestion and assume that the file was already ingested.
+If not, run the ingestion and write the sha256sum of the paper to ./examples/ingested.txt (append)
+Do not query, before the file was fully ingested.
+Give References. Abort if any step fails.
+
+---
+
+name: ingest
+description: Ingests documents into a VectorDB.
+args: filename: Path to the input file
+
+#!bash
+scripts/ingest.sh llama2 ${filename}
+
+---
+
+name: query
+description: Querys the vector database with the given prompt. Response contains also source references that can be used for citations.
+args: prompt: The query prompt to ask the vector database. URL Encoded string.
+
+#!http://localhost:8000/datasets/llama2/query?query=${query}&topk=5
