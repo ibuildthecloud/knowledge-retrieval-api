@@ -96,7 +96,7 @@ async def delete_dataset(name: str):
 
 
 @app.post("/datasets/{name}/query")
-async def query(name: str, query: str):
+async def query(name: str, query: str, topk: int = 5):
     """Query the VectorDB with a user-given prompt.
 
     Args:
@@ -104,26 +104,30 @@ async def query(name: str, query: str):
         query (str): Prompt to query the dataset with
 
     Raises:
+        HTTPException: 404 Not Found if the dataset does not exist
         HTTPException: 500 Internal Server Error if any other error occurs
 
     Returns:
         JSONResponse: Top-k results from the query
     """
     try:
-        results = db.query(prompt=query, dataset=name)
+        results = db.query(prompt=query, dataset=name, topk=topk)
         return {"results": results}
+    except dberr.DatasetDoesNotExistError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/datasets/{name}/ingest")
-async def ingest_data(input_data: Ingest):
+async def ingest_data(name: str, input_data: Ingest):
     """Ingest new data into the VectorDB.
 
     Args:
         input (Ingest): Base64 encoded data to ingest, with an optional filename.
 
     Raises:
+        HTTPException: 404 Not Found if the dataset does not exist
         HTTPException: 500 Internal Server Error if any other error occurs
 
     Returns:
@@ -134,8 +138,17 @@ async def ingest_data(input_data: Ingest):
         # Convert base64 data to appropriate format and ingest into pgvector
         # You would need to implement the logic here based on your requirements
         # This could involve using OpenAI API for embedding and then storing in pgvector
-        ingest.ingest_document(input_data.filename, input_data.data)
-        return {"message": "Data ingested successfully"}
+        ingested = ingest.ingest_document(name, input_data.filename, input_data.data)
+        return {
+            "message": (
+                "Successfully ingested data" + f" from file '{input_data.filename}'"
+                if input_data.filename
+                else ""
+            ),
+            "num_ingested_docs": ingested,
+        }
+    except dberr.DatasetDoesNotExistError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

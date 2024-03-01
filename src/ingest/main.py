@@ -6,8 +6,21 @@ import base64
 import tempfile
 import os
 
+import db.main as db
 
-def ingest_document(filename: str | None, content: str):
+
+def ingest_document(dataset: str, filename: str | None, content: str) -> int:
+    """Ingest a file into the VectorDB.
+
+    Args:
+        dataset (str): Name of the target dataset
+        filename (str | None): Name of the file, if available - makes filetype guessing more accurate
+        content (str): Base64 encoded file content
+
+    Returns:
+        int: Number of ingested documents (a single file can be multiple documents)
+    """
+
     # Decode content to temporary file, using original filename for filetype inference, if available
     file_content = base64.b64decode(content)
 
@@ -16,16 +29,27 @@ def ingest_document(filename: str | None, content: str):
     if filename is None or filename == "":
         filename = "document"
 
+    # TODO: use google's magika to guess filetype and filter supported
+
     path = os.path.join(tmpdir, filename)
 
     with open(path, "wb") as file:
         file.write(file_content)
 
+    # Load file
+    documents = load_file(path)
+
+    # Ingest documents: Create embeddings and store in the VectorDB
+    db.ingest_documents(dataset, documents)
+
     # Cleanup
+    os.remove(path)
     os.rmdir(tmpdir)
 
+    return len(documents)
 
-def load_document(path: str) -> List[Document]:
+
+def load_file(path: str) -> List[Document]:
     """Load a document from a given path.
 
     Args:

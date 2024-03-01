@@ -1,4 +1,4 @@
 run-dev:
 	docker compose up -d
-	sleep 5
+	while ! nc -z localhost 5432; do sleep 1; done
 	uvicorn main:app --reload

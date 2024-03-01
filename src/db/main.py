@@ -1,5 +1,5 @@
 import psycopg2
-
+from typing import List
 from config import settings
 from .errors import DatasetExistsError, DatasetDoesNotExistError
 from llama_index.vector_stores.postgres import PGVectorStore
@@ -28,6 +28,20 @@ dbconn = psycopg2.connect(
     password=settings.db_password,
 )
 dbconn.autocommit = True
+
+
+def vector_store_exists(name: str) -> bool:
+    with dbconn.cursor() as c:
+        n = f"data_{name}"
+        c.execute(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = %s)",
+            (n,),
+        )
+        x = c.fetchone()
+        if x is None or not x[0]:
+            print(f"Table {n} does not exist")
+            return False
+        return True
 
 
 def get_vector_store(name: str, embed_dim: int = 1536) -> PGVectorStore:
@@ -63,16 +77,8 @@ def create_dataset(name: str, embed_dim: int = 1536):
     """
 
     # Raise Exception if dataset already exists
-    with dbconn.cursor() as c:
-        n = f"data_{name}"
-        print(n)
-        c.execute(
-            "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = %s)",
-            (n,),
-        )
-        x = c.fetchone()
-        if x is not None and x[0]:
-            raise DatasetExistsError(name)
+    if vector_store_exists(name):
+        raise DatasetExistsError(name)
 
     # Initialize VectorStore for the dataset
     vector_store = get_vector_store(name, embed_dim=embed_dim)
@@ -91,31 +97,29 @@ def delete_dataset(name: str):
     """
 
     # Raise Exception if dataset does not exist
+    if not vector_store_exists(name):
+        raise DatasetDoesNotExistError(name)
+
     with dbconn.cursor() as c:
         n = f"data_{name}"
-        c.execute(
-            "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = %s)",
-            (n,),
-        )
-        x = c.fetchone()
-        if x is None or not x[0]:
-            raise DatasetDoesNotExistError(name)
-
         # Drop the table
         c.execute(f"DROP TABLE {n}")
         dbconn.commit()
 
 
-def ingest_document(
+def ingest_documents(
     dataset: str,
-    document: Document,
+    documents: List[Document],
     embed_model_name: str = OpenAIEmbeddingModelType.TEXT_EMBED_ADA_002,
 ):
+    if not vector_store_exists(dataset):
+        raise DatasetDoesNotExistError(dataset)
+
     vector_store = get_vector_store(dataset)
 
     embed_model = OpenAIEmbedding(
         model=embed_model_name,
-        dimensions=vector_store.embed_dim,
+        # dimensions=vector_store.embed_dim, # FIXME: set dimensions only for models that support it
         # TODO: Set API parameters and allow for other embed_models to make it work with Rubra
     )
 
@@ -123,14 +127,19 @@ def ingest_document(
         vector_store=vector_store, embed_model=embed_model
     )
 
-    vector_store_index.insert(document)
+    for document in documents:
+        vector_store_index.insert(document)
 
 
 def query(
     dataset: str,
     prompt: str,
+    topk: int,
     embed_model_name: str = OpenAIEmbeddingModelType.TEXT_EMBED_ADA_002,
 ):
+    if not vector_store_exists(dataset):
+        raise DatasetDoesNotExistError(dataset)
+
     vector_store = get_vector_store(dataset)
     embed_model = OpenAIEmbedding(
         model=embed_model_name,
@@ -140,7 +149,9 @@ def query(
         vector_store=vector_store, embed_model=embed_model
     )
 
-    retriever = VectorIndexRetriever(index=vector_store_index, embed_model=embed_model)
+    retriever = VectorIndexRetriever(
+        index=vector_store_index, embed_model=embed_model, similarity_top_k=topk
+    )
 
     query_engine = RetrieverQueryEngine(
         retriever=retriever,
