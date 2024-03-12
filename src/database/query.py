@@ -2,8 +2,10 @@ import os
 from typing import List
 from pydantic import BaseModel
 
+from config import settings
+
 from .errors import DatasetDoesNotExistError
-from .main import get_vector_store, vector_store_exists
+from .main import get_vector_store, dataset_exists
 
 
 from llama_index.core.indices import VectorStoreIndex
@@ -34,12 +36,14 @@ def query(
     topk: int,
     embed_model_name: str = OpenAIEmbeddingModelType.TEXT_EMBED_ADA_002,
 ) -> QueryResponse | None:
-    if not vector_store_exists(dataset):
+    if not dataset_exists(dataset):
         raise DatasetDoesNotExistError(dataset)
 
     vector_store = get_vector_store(dataset)
     embed_model = OpenAIEmbedding(
         model=embed_model_name,
+        api_base=settings.api_base,
+        additional_kwargs={"encoding_format": "float"},
     )
 
     vector_store_index = VectorStoreIndex.from_vector_store(

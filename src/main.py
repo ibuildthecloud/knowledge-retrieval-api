@@ -3,8 +3,10 @@ from pydantic import BaseModel
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.staticfiles import StaticFiles
-import db
+import database
 import ingest.main as ingest
+import traceback
+import uuid
 
 
 app = FastAPI(title="Rubra - Knowledge Retrieval API")
@@ -26,6 +28,7 @@ class Query(BaseModel):
 
 class Ingest(BaseModel):
     filename: str | None  # Optional filename
+    file_id: str | None  # Optional file_id
     data: str  # Base64 encoded data
 
 
@@ -79,9 +82,9 @@ async def create_dataset(dataset: Dataset) -> Dataset:
         Dataset: Resulting dataset object
     """
     try:
-        db.create_dataset(dataset.name)  # TODO: take embed_dim as input
+        database.create_dataset(dataset.name)  # TODO: take embed_dim as input
         return Dataset(name=dataset.name, embed_dim=1536)
-    except db.DatasetExistsError as e:
+    except database.DatasetExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -103,15 +106,15 @@ async def delete_dataset(name: str):
     """
     # Delete dataset from the VectorDB
     try:
-        db.delete_dataset(name)
+        database.delete_dataset(name)
         return {"message": f"Dataset '{name}' deleted successfully"}
-    except db.DatasetDoesNotExistError as e:
+    except database.DatasetDoesNotExistError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/datasets/{name}/query")
+@app.get("/datasets/{name}/query")
 async def query(name: str, query: str, topk: int = 5):
     """Query the VectorDB with a user-given prompt.
 
@@ -127,9 +130,9 @@ async def query(name: str, query: str, topk: int = 5):
         JSONResponse: Top-k results from the query
     """
     try:
-        results = db.query(prompt=query, dataset=name, topk=topk)
+        results = database.query(prompt=query, dataset=name, topk=topk)
         return {"results": results}
-    except db.DatasetDoesNotExistError as e:
+    except database.DatasetDoesNotExistError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -154,16 +157,80 @@ async def ingest_data(name: str, input_data: Ingest):
         # Convert base64 data to appropriate format and ingest into pgvector
         # You would need to implement the logic here based on your requirements
         # This could involve using OpenAI API for embedding and then storing in pgvector
-        ingested = await ingest.ingest_file(name, input_data.filename, input_data.data)
+        file_id = input_data.file_id if input_data.file_id else str(uuid.uuid4())
+
+        ingested = await ingest.ingest_file(
+            dataset=name,
+            filename=input_data.filename,
+            file_id=file_id,
+            content=input_data.data,
+        )
         return {
             "message": (
                 "Successfully ingested data" + f" from file '{input_data.filename}'"
                 if input_data.filename
                 else ""
             ),
-            "num_ingested_docs": ingested,
+            "num_ingested_docs": ingested["num_ingested_docs"],
+            "documents": ingested["documents"],
+            "file_id": file_id,
         }
-    except db.DatasetDoesNotExistError as e:
+    except database.DatasetDoesNotExistError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except database.DocumentExistsError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/datasets/{name}/documents/{document_id}")
+def remove_document(name: str, document_id: str):
+    """Remove a document from a dataset.
+
+    Args:
+        name (str): Name of the target dataset.
+        document_id (str): ID of the Document to remove
+
+    Raises:
+        HTTPException: 404 Not Found if the dataset does not exist
+        HTTPException: 500 Internal Server Error if any other error occurs
+
+    Returns:
+        JSONResponse: Success message on successful document removal
+    """
+    try:
+        database.remove_document(name, document_id)
+        return {"message": f"Document '{document_id}' removed successfully"}
+    except (database.DatasetDoesNotExistError, database.DocumentDoesNotExistError) as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/datasets/{name}/files/{file_id}")
+def remove_file(name: str, file_id: str):
+    """Remove a file from a dataset.
+
+    Args:
+        name (str): Name of the target dataset.
+        file_id (str): ID of the File to remove
+
+    Raises:
+        HTTPException: 404 Not Found if the dataset does not exist
+        HTTPException: 500 Internal Server Error if any other error occurs
+
+    Returns:
+        JSONResponse: Success message on successful document removal
+    """
+    try:
+        database.remove_file(name, file_id)
+        return {"message": f"File '{file_id}' removed successfully"}
+    except (
+        database.DatasetDoesNotExistError,
+        database.DocumentDoesNotExistError,
+        database.FileDoesNotExistError,
+    ) as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -171,5 +238,7 @@ async def ingest_data(name: str, input_data: Ingest):
 
 if __name__ == "__main__":
     import uvicorn
+
+    database.init_db()
 
     uvicorn.run(app, host="0.0.0.0", port=8000)

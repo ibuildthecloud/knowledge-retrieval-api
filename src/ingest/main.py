@@ -1,23 +1,43 @@
-from typing import List
+from typing import List, Optional
 from llama_index.core import SimpleDirectoryReader, Document
 import base64
 import tempfile
 import os
 
-from db import ingest_documents
+from database import ingest_documents, get_session
+from database.models import FileIndex, DocumentIndex
+
+from database.errors import DocumentExistsError
 
 
-async def ingest_file(dataset: str, filename: str | None, content: str) -> int:
+async def ingest_file(
+    dataset: str,
+    content: str,
+    file_id: str,
+    filename: Optional[str] = None,
+) -> dict:
     """Ingest a file into the VectorDB.
 
     Args:
         dataset (str): Name of the target dataset
-        filename (str | None): Name of the file, if available - makes filetype guessing more accurate
         content (str): Base64 encoded file content
+        filename (str | None): Name of the file, if available - makes filetype guessing more accurate
+        file_id (str | None): Optional ID that will be used to identify documents generated from the file
 
     Returns:
         int: Number of ingested documents (a single file can be multiple documents)
     """
+    db = get_session()
+
+    if file_id is not None:
+        existing = (
+            db.query(FileIndex)
+            .filter_by(dataset=dataset, file_id=file_id)
+            .one_or_none()
+        )
+        if existing is not None:
+            db.close()
+            raise DocumentExistsError(dataset, file_id)
 
     # Decode content to temporary file, using original filename for filetype inference, if available
     file_content = base64.b64decode(content)
@@ -44,7 +64,33 @@ async def ingest_file(dataset: str, filename: str | None, content: str) -> int:
     os.remove(path)
     os.rmdir(tmpdir)
 
-    return len(documents)
+    doc_ids = [doc.doc_id for doc in documents]
+
+    file_index = FileIndex(
+        dataset=dataset,
+        file_id=file_id,
+    )
+
+    docs: list[DocumentIndex] = [
+        DocumentIndex(
+            dataset=dataset,
+            file_id=file_id,
+            document_id=doc_id,
+        )
+        for doc_id in doc_ids
+    ]
+
+    db.add(file_index)
+    db.commit()
+    db.add_all(docs)
+    db.commit()
+
+    db.close()
+
+    return {
+        "num_ingested_docs": len(documents),
+        "documents": doc_ids,
+    }
 
 
 def load_file(path: str) -> List[Document]:

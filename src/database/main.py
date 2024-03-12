@@ -1,8 +1,15 @@
 import asyncio
-import psycopg2
+from log import log
+from sqlalchemy import text
+from database.db import get_session as dbconn
+from database import models
 from typing import List
 from config import settings
-from .errors import DatasetExistsError, DatasetDoesNotExistError
+from database.errors import (
+    DatasetExistsError,
+    DatasetDoesNotExistError,
+    FileDoesNotExistError,
+)
 from llama_index.vector_stores.postgres import PGVectorStore
 
 
@@ -20,6 +27,7 @@ from llama_index.embeddings.openai import OpenAIEmbedding, OpenAIEmbeddingModelT
 from llama_index.llms.openai import OpenAI
 
 
+
 from llama_index.core.extractors import (
     SummaryExtractor,
     QuestionsAnsweredExtractor,
@@ -28,31 +36,19 @@ from llama_index.core.extractors import (
 )
 
 
-#
-# Database Connection
-#
-dbconn = psycopg2.connect(
-    host=settings.db_host,
-    port=settings.db_port,
-    dbname=settings.db_dbname,
-    user=settings.db_user,
-    password=settings.db_password,
-)
-dbconn.autocommit = True
-
-
-def vector_store_exists(name: str) -> bool:
-    with dbconn.cursor() as c:
-        n = f"data_{name}"
-        c.execute(
-            "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = %s)",
-            (n,),
-        )
-        x = c.fetchone()
-        if x is None or not x[0]:
-            print(f"Table {n} does not exist")
-            return False
-        return True
+def dataset_exists(name: str) -> bool:
+    c = dbconn()
+    n = f"data_{name}"
+    x = c.execute(
+        text(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = :name)"
+        ),
+        {"name": n},
+    ).scalar()
+    if not x:
+        print(f"Table {n} does not exist")
+        return False
+    return True
 
 
 def get_vector_store(name: str, embed_dim: int = 1536) -> PGVectorStore:
@@ -88,7 +84,7 @@ def create_dataset(name: str, embed_dim: int = 1536):
     """
 
     # Raise Exception if dataset already exists
-    if vector_store_exists(name):
+    if dataset_exists(name):
         raise DatasetExistsError(name)
 
     # Initialize VectorStore for the dataset
@@ -108,7 +104,7 @@ def delete_dataset(name: str):
     """
 
     # Raise Exception if dataset does not exist
-    if not vector_store_exists(name):
+    if not dataset_exists(name):
         raise DatasetDoesNotExistError(name)
 
     with dbconn.cursor() as c:
@@ -123,15 +119,18 @@ async def ingest_documents(
     documents: List[Document],
     embed_model_name: str = OpenAIEmbeddingModelType.TEXT_EMBED_ADA_002,
 ):
-    if not vector_store_exists(dataset):
+    if not dataset_exists(dataset):
         raise DatasetDoesNotExistError(dataset)
 
     vector_store = get_vector_store(dataset)
 
     embed_model = OpenAIEmbedding(
         model=embed_model_name,
+        api_base=settings.api_base,
+        additional_kwargs={"encoding_format": "float"},
         # dimensions=vector_store.embed_dim, # FIXME: set dimensions only for models that support it
         # TODO: Set API parameters and allow for other embed_models to make it work with Rubra
+        # - also allows specifying different modes for text search (current) or similarity search
     )
 
     vector_store_index = VectorStoreIndex.from_vector_store(
@@ -162,7 +161,11 @@ async def ingest_documents(
         KeywordExtractor(keywords=10, llm=llm),  # extract 10 keywords for each node
     ]
 
-    pipeline = IngestionPipeline(transformations=transformations)
+    pipeline = IngestionPipeline(
+        transformations=transformations,
+        vector_store=vector_store,
+        docstore=vector_store_index.docstore,
+    )
 
     loop = asyncio.get_running_loop()
     nodes = await loop.run_in_executor(
@@ -170,3 +173,76 @@ async def ingest_documents(
     )
 
     vector_store_index.insert_nodes(nodes)
+
+    return nodes
+
+
+def remove_document(dataset: str, document_id: str, session=None):
+    """Remove a document from the Index and underlying Docstore
+
+    Args:
+        dataset (str): Name of the target dataset
+        document_id (str): ID of the document to remove
+
+    Raises:
+        DatasetDoesNotExistError: Error if the dataset does not exist
+
+    NOTE: The Postgres VectorStore does not have any option for us to know if that document exists in the store or not, so we cannot raise an error if the document does not exist.
+    """
+    vector_store = get_vector_store(dataset)
+    if vector_store is None:
+        raise DatasetDoesNotExistError(dataset)
+
+    vector_store_index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
+
+    vector_store_index.delete_ref_doc(document_id, delete_from_docstore=True)
+
+    dbsess = dbconn() if session is None else session
+    log.info(f"Removing document {dataset}/{document_id}")
+    dbsess.query(models.DocumentIndex).filter(
+        models.DocumentIndex.document_id == document_id,
+        models.DocumentIndex.dataset == dataset,
+    ).delete()
+
+    # If an existing session was passed in, then the caller is responsible for committing and closing the session
+    if session is None:
+        dbsess.commit()
+        dbsess.close()
+
+
+def remove_file(dataset: str, file_id: str) -> list[str] | None:
+    """Remove a file from the Index and underlying Docstore
+
+    Args:
+        dataset (str): Name of the target dataset
+        file_id (str): ID of the file to remove
+
+    Raises:
+        DatasetDoesNotExistError: Error if the dataset does not exist
+
+    NOTE: The Postgres VectorStore does not have any option for us to know if that document exists in the store or not, so we cannot raise an error if the document does not exist.
+    """
+
+    session = dbconn()
+
+    file = (
+        session.query(models.FileIndex)
+        .filter(
+            models.FileIndex.file_id == file_id, models.FileIndex.dataset == dataset
+        )
+        .one_or_none()
+    )
+
+    if file is None:
+        raise FileDoesNotExistError(dataset, file_id)
+
+    for document in file.documents:
+        log.info(f"Removing document {dataset}/{document.document_id}")
+        remove_document(dataset, document.document_id, session=session)
+
+    log.info(f"Removing file {dataset}/{file_id}")
+
+    session.refresh(file)
+    session.delete(file)
+    session.commit()
+    session.close()

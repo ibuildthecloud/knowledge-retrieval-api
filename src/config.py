@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     db_password: str = "pgvector"
     db_dbname: str = "pgvector"
 
+    api_base: str = "http://localhost:8080/v1/"
+
     class Config:
         env_prefix = "KRA_"
 
