@@ -1,12 +1,15 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, HTTPException, Request, status
+from pydantic import BaseModel, Field
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
 import database
 import ingest.main as ingest
 import traceback
 import uuid
+from typing import Optional
+from log import log
 
 
 app = FastAPI(title="Rubra - Knowledge Retrieval API")
@@ -18,7 +21,7 @@ app.mount("/static", StaticFiles(directory="src/static"), name="static")
 #
 class Dataset(BaseModel):
     name: str
-    embed_dim: int
+    embed_dim: Optional[int] = Field(1536, description="Embedding Dimension")
 
 
 class Query(BaseModel):
@@ -27,9 +30,22 @@ class Query(BaseModel):
 
 
 class Ingest(BaseModel):
-    filename: str | None  # Optional filename
-    file_id: str | None  # Optional file_id
-    data: str  # Base64 encoded data
+    filename: Optional[str] = Field(None, description="Filename")
+    file_id: Optional[str] = Field(None, description="File ID")
+    content: str  # Base64 encoded data
+
+
+#
+# Exception Handler
+#
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    exc_str = f"{exc}".replace("\n", " ").replace("   ", " ")
+    log.error(f"{request}: {exc_str}")
+    content = {"status_code": 10422, "message": exc_str, "data": None}
+    return JSONResponse(
+        content=content, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
+    )
 
 
 #
@@ -82,8 +98,11 @@ async def create_dataset(dataset: Dataset) -> Dataset:
         Dataset: Resulting dataset object
     """
     try:
+        dataset.name = dataset.name.lower()
         database.create_dataset(dataset.name)  # TODO: take embed_dim as input
-        return Dataset(name=dataset.name, embed_dim=1536)
+        res = Dataset(name=dataset.name, embed_dim=1536)
+        log.info(f"Created dataset '{dataset.name}'")
+        return res
     except database.DatasetExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
@@ -106,11 +125,13 @@ async def delete_dataset(name: str):
     """
     # Delete dataset from the VectorDB
     try:
+        name = name.lower()
         database.delete_dataset(name)
         return {"message": f"Dataset '{name}' deleted successfully"}
     except database.DatasetDoesNotExistError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        log.error(f"Error deleting dataset '{name}': {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -130,6 +151,7 @@ async def query(name: str, query: str, topk: int = 5):
         JSONResponse: Top-k results from the query
     """
     try:
+        name = name.lower()
         results = database.query(prompt=query, dataset=name, topk=topk)
         return {"results": results}
     except database.DatasetDoesNotExistError as e:
@@ -154,6 +176,7 @@ async def ingest_data(name: str, input_data: Ingest):
     """
     # Ingest new data into the VectorDB
     try:
+        name = name.lower()
         # Convert base64 data to appropriate format and ingest into pgvector
         # You would need to implement the logic here based on your requirements
         # This could involve using OpenAI API for embedding and then storing in pgvector
@@ -163,7 +186,7 @@ async def ingest_data(name: str, input_data: Ingest):
             dataset=name,
             filename=input_data.filename,
             file_id=file_id,
-            content=input_data.data,
+            content=input_data.content,
         )
         return {
             "message": (
@@ -200,6 +223,7 @@ def remove_document(name: str, document_id: str):
         JSONResponse: Success message on successful document removal
     """
     try:
+        name = name.lower()
         database.remove_document(name, document_id)
         return {"message": f"Document '{document_id}' removed successfully"}
     except (database.DatasetDoesNotExistError, database.DocumentDoesNotExistError) as e:
@@ -224,6 +248,7 @@ def remove_file(name: str, file_id: str):
         JSONResponse: Success message on successful document removal
     """
     try:
+        name = name.lower()
         database.remove_file(name, file_id)
         return {"message": f"File '{file_id}' removed successfully"}
     except (

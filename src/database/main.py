@@ -27,7 +27,6 @@ from llama_index.embeddings.openai import OpenAIEmbedding, OpenAIEmbeddingModelT
 from llama_index.llms.openai import OpenAI
 
 
-
 from llama_index.core.extractors import (
     SummaryExtractor,
     QuestionsAnsweredExtractor,
@@ -38,7 +37,7 @@ from llama_index.core.extractors import (
 
 def dataset_exists(name: str) -> bool:
     c = dbconn()
-    n = f"data_{name}"
+    n = f"data_{name}".lower()
     x = c.execute(
         text(
             "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = :name)"
@@ -107,11 +106,23 @@ def delete_dataset(name: str):
     if not dataset_exists(name):
         raise DatasetDoesNotExistError(name)
 
-    with dbconn.cursor() as c:
-        n = f"data_{name}"
-        # Drop the table
-        c.execute(f"DROP TABLE {n}")
-        dbconn.commit()
+    session = dbconn()
+    # Drop Files and Documents
+    session.query(models.FileIndex).filter(models.FileIndex.dataset == name).delete()
+    session.query(models.DocumentIndex).filter(
+        models.DocumentIndex.dataset == name
+    ).delete()
+    session.commit()
+
+    # Drop the table
+    table_name = f"data_{name}".lower()
+    safe_table_name = (
+        text(table_name).compile(compile_kwargs={"literal_binds": True}).string
+    )
+    sql = f'DROP TABLE "{safe_table_name}"'
+    session.execute(text(sql))
+    session.commit()
+    session.close()
 
 
 async def ingest_documents(
