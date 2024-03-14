@@ -180,6 +180,9 @@ async def ingest_documents(
         docstore=vector_store_index.docstore,
     )
 
+    # TODO: This is not being killed when we stop the server, so we need to fix this
+    # TODO: Replace either with a background task (FastAPI native) or a proper async task (Celery)
+    # TODO: Stream progress to the client
     loop = asyncio.get_running_loop()
     nodes = await loop.run_in_executor(
         None, lambda: pipeline.run(documents=documents, show_progress=False)
