@@ -149,7 +149,9 @@ async def ingest_documents(
         embed_model=embed_model,
     )
 
-    llm = OpenAI()
+    llm = OpenAI(
+        api_base=settings.api_base,
+    )
     service_context = ServiceContext.from_defaults(llm=llm)
     set_global_service_context(
         service_context

@@ -1,7 +1,6 @@
 name: retrieval
 description: A tool that queries the knowledge retrieval API to get an answer to a query from ingested documents. Response contains also source references that can be used for citations.
-args: knowledge_retrieval_api_url: The URL of the Knowledge Retrieval API to send the query to.
-args: dataset: The name of the dataset which is expected to hold the answer.
+
 args: prompt: The query prompt to ask the vector database. URL Encoded string.
 
-#!http://${knowledge_retrieval_api_url}/datasets/${dataset}/query?query=${prompt}&topk=5
+#!http://${knowledge_retrieval_api_url}/datasets/${knowledge_retrieval_dataset}/query

@@ -26,7 +26,7 @@ class Dataset(BaseModel):
 
 class Query(BaseModel):
     prompt: str
-    topk: int
+    topk: Optional[int] = Field(5, description="Number of results to return")
 
 
 class Ingest(BaseModel):
@@ -135,8 +135,8 @@ async def delete_dataset(name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/datasets/{name}/query")
-async def query(name: str, query: str, topk: int = 5):
+@app.post("/datasets/{name}/query")
+async def query(name: str, q: Query):
     """Query the VectorDB with a user-given prompt.
 
     Args:
@@ -152,7 +152,8 @@ async def query(name: str, query: str, topk: int = 5):
     """
     try:
         name = name.lower()
-        results = database.query(prompt=query, dataset=name, topk=topk)
+        log.info(f"Querying dataset '{name}' with prompt: '{q.prompt}'")
+        results = database.query(prompt=q.prompt, dataset=name, topk=q.topk or 5)
         return {"results": results}
     except database.DatasetDoesNotExistError as e:
         raise HTTPException(status_code=404, detail=str(e))
