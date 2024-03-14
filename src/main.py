@@ -106,6 +106,9 @@ async def create_dataset(dataset: Dataset) -> Dataset:
     except database.DatasetExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
+        log.error(
+            f"Error creating dataset '{dataset.name}': {e}\n{traceback.format_exc()}"
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -131,7 +134,7 @@ async def delete_dataset(name: str):
     except database.DatasetDoesNotExistError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        log.error(f"Error deleting dataset '{name}': {e}")
+        log.error(f"Error deleting dataset '{name}': {e}\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -158,6 +161,9 @@ async def query(name: str, q: Query):
     except database.DatasetDoesNotExistError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        log.error(
+            f"Error querying dataset '{name}' with prompt '{q.prompt}': {e}\n{traceback.format_exc()}"
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -204,7 +210,9 @@ async def ingest_data(name: str, input_data: Ingest):
     except database.DocumentExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
-        print(traceback.format_exc())
+        log.error(
+            f"Error ingesting data into dataset '{name}': {e}\n{traceback.format_exc()}"
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -230,6 +238,9 @@ def remove_document(name: str, document_id: str):
     except (database.DatasetDoesNotExistError, database.DocumentDoesNotExistError) as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        log.error(
+            f"Error removing document '{document_id}' from dataset '{name}': {e}\n{traceback.format_exc()}"
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -259,6 +270,9 @@ def remove_file(name: str, file_id: str):
     ) as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        log.error(
+            f"Error removing file '{file_id}' from dataset '{name}': {e}\n{traceback.format_exc()}"
+        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
