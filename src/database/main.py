@@ -173,17 +173,33 @@ async def ingest_documents(
     for doc in documents:
         doc.text = doc.text.replace("\x00", "")
 
+    from llama_index.core.ingestion.cache import IngestionCache
+    from llama_index.core.storage.kvstore.postgres_kvstore import PostgresKVStore
+
+    cache = IngestionCache(
+        cache=PostgresKVStore.from_params(
+            host=settings.db_host,
+            port=str(settings.db_port),
+            database=settings.db_dbname,
+            user=settings.db_user,
+            password=settings.db_password,
+            table_name="ingestion_cache",
+            debug=True,
+        ),
+    )
+
     pipeline = IngestionPipeline(
         transformations=transformations,
         vector_store=vector_store,
         docstore=vector_store_index.docstore,
+        cache=cache,
     )
 
     # TODO: This is not being killed when we stop the server, so we need to fix this
     # TODO: Replace either with a background task (FastAPI native) or a proper async task (Celery)
     # TODO: Stream progress to the client
     pipeline_start_time = time.time()
-    nodes = await pipeline.arun(documents=documents, show_progress=False, num_workers=2)
+    nodes = await pipeline.arun(documents=documents, show_progress=False, num_workers=1)
     pipeline_duration = time.time() - pipeline_start_time
     log.info(
         f"[dataset={dataset}] Ingestion pipeline took {pipeline_duration:.2f} seconds for {len(nodes)} nodes from {len(documents)} documents"

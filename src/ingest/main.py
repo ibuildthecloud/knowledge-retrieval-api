@@ -57,6 +57,18 @@ async def ingest_file(
     # Load file
     documents = load_file(path)
 
+    # Sanitize metadata, since e.g. modification date is wrong, as it was just created as a temp file
+    # and keeping this metadata will screw with the cache key calculation
+    for document in documents:
+        # Dates are always the current date, so drop them
+        for key in ["creation_date", "last_modified_date"]:
+            document.metadata.pop(key, None)
+
+        # Path is always tmpdir + filename, so remove the tmpdir part
+        document.metadata["file_path"] = os.path.basename(
+            document.metadata["file_path"]
+        )
+
     # Ingest documents: Create embeddings and store in the VectorDB
     await ingest_documents(dataset, documents)
 
