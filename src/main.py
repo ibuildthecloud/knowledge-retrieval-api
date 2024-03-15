@@ -216,7 +216,7 @@ async def ingest_data(name: str, input_data: Ingest):
         raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         log.error(
-            f"Error ingesting data into dataset '{name}': {e}\n{traceback.format_exc()}"
+            f"Error ingesting data [file_id='{input_data.file_id}', file_name='{input_data.filename}'] into dataset '{name}': {e}\n{traceback.format_exc()}"
         )
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -290,6 +290,7 @@ def get_datasets():
     """
     return {"datasets": database.list_datasets()}
 
+
 @app.get("/datasets/{name}")
 def get_dataset(name: str):
     """Get a dataset from the VectorDB.
@@ -308,6 +309,7 @@ def get_dataset(name: str):
         return database.get_dataset(name)
     except database.DatasetDoesNotExistError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,5 +1,6 @@
 alembic==1.13.1
 llama-index==0.10.19
+llama-index-core==0.10.20
 llama-index-readers-file==0.1.11
 llama-index-embeddings-openai==0.1.6
 llama-index-vector-stores-postgres==0.1.3

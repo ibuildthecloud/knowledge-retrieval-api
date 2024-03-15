@@ -44,7 +44,6 @@ def dataset_exists(name: str) -> bool:
         {"name": n},
     ).scalar()
     if not x:
-        print(f"Table {n} does not exist")
         return False
     return True
 
@@ -169,6 +168,10 @@ async def ingest_documents(
         ),  # extract summaries for previous and current node
         KeywordExtractor(keywords=10, llm=llm),  # extract 10 keywords for each node
     ]
+
+    # Sanitization of documents - remove NUL (0x00) characters which are not allowed in Postgres/pgvector
+    for doc in documents:
+        doc.text = doc.text.replace("\x00", "")
 
     pipeline = IngestionPipeline(
         transformations=transformations,

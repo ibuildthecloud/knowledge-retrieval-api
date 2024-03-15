@@ -78,8 +78,8 @@ def query(
 
     sources_txt = "\n".join(
         [
-            f"[{source.filename}:: Page {source.page}] - {source.document_title}"
-            for source in sources
+            f"[{idx}] file={source.filename} page={source.page}]: {source.document_title}"
+            for idx, source in enumerate(sources)
         ]
     )
 
