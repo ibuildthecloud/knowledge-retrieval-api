@@ -153,6 +153,11 @@ async def query(name: str, q: Query):
     Returns:
         JSONResponse: Top-k results from the query
     """
+    if q.prompt is None or q.prompt.strip() == "":
+        raise HTTPException(
+            status_code=400,
+            detail="You didn't provide a query prompt, so I cannot retrieve potential answers to your question.",
+        )
     try:
         name = name.lower()
         log.info(f"Querying dataset '{name}' with prompt: '{q.prompt}'")
