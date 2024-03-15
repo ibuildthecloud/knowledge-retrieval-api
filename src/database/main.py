@@ -1,4 +1,4 @@
-import asyncio
+import time
 from log import log
 from sqlalchemy import text
 from database.db import get_session as dbconn
@@ -29,7 +29,6 @@ from llama_index.llms.openai import OpenAI
 
 from llama_index.core.extractors import (
     SummaryExtractor,
-    QuestionsAnsweredExtractor,
     TitleExtractor,
     KeywordExtractor,
 )
@@ -165,9 +164,6 @@ async def ingest_documents(
         TitleExtractor(
             nodes=5, llm=llm
         ),  # assuming the title is located within the first 5 nodes ("pages")
-        QuestionsAnsweredExtractor(
-            questions=3, llm=llm
-        ),  # generates 3 questions that a node answers
         SummaryExtractor(
             summaries=["prev", "self"], llm=llm
         ),  # extract summaries for previous and current node
@@ -183,9 +179,11 @@ async def ingest_documents(
     # TODO: This is not being killed when we stop the server, so we need to fix this
     # TODO: Replace either with a background task (FastAPI native) or a proper async task (Celery)
     # TODO: Stream progress to the client
-    loop = asyncio.get_running_loop()
-    nodes = await loop.run_in_executor(
-        None, lambda: pipeline.run(documents=documents, show_progress=False)
+    pipeline_start_time = time.time()
+    nodes = await pipeline.arun(documents=documents, show_progress=False, num_workers=2)
+    pipeline_duration = time.time() - pipeline_start_time
+    log.info(
+        f"[dataset={dataset}] Ingestion pipeline took {pipeline_duration:.2f} seconds for {len(nodes)} nodes from {len(documents)} documents"
     )
 
     vector_store_index.insert_nodes(nodes)
