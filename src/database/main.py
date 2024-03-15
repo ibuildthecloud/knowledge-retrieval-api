@@ -260,3 +260,68 @@ def remove_file(dataset: str, file_id: str) -> list[str] | None:
     session.delete(file)
     session.commit()
     session.close()
+
+
+def get_dataset(dataset: str) -> dict[str, any]:
+    """Get information about the dataset
+
+    Args:
+        dataset (str): Name of the target dataset
+
+    Returns:
+        dict[str, any]: Information about the dataset
+    """
+    if not dataset_exists(dataset):
+        raise DatasetDoesNotExistError(dataset)
+
+    response = {
+        "name": dataset,
+        "num_files": 0,
+        "files": [],
+    }
+
+    session = dbconn()
+    files = (
+        session.query(models.FileIndex)
+        .filter(models.FileIndex.dataset == dataset)
+        .all()
+    )
+
+    response["num_files"] = len(files)
+
+    for file in files:
+        file_item = {
+            "file_id": file.file_id,
+            "num_documents": len(file.documents),
+        }
+        response["files"].append(
+            {
+                "file_id": file.file_id,
+                "num_documents": len(file.documents),
+                "documents": [doc.document_id for doc in file.documents],
+            }
+        )
+
+    session.close()
+
+    return response
+
+
+def list_datasets() -> list[str]:
+    """Get a list of all available datasets
+
+    Returns:
+        list[str]: List of all available datasets
+    """
+    session = dbconn()
+    tables = session.execute(
+        text(
+            "SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'data_%'"
+        )
+    ).all()
+    session.close()
+    return [
+        str(table[0]).removeprefix("data_")
+        for table in tables
+        if table[0] not in ["data_type_privileges", "data_ingestion_cache"]
+    ]

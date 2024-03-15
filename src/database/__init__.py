@@ -4,6 +4,8 @@ from .main import (  # noqa
     ingest_documents,
     remove_document,
     remove_file,
+    list_datasets,
+    get_dataset,
 )
 from .query import query  # noqa
 from .errors import *  # noqa

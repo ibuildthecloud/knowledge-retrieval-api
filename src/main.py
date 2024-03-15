@@ -281,6 +281,34 @@ def remove_file(name: str, file_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/datasets")
+def get_datasets():
+    """Get all datasets in the VectorDB.
+
+    Returns:
+        JSONResponse: List of all datasets in the VectorDB
+    """
+    return {"datasets": database.list_datasets()}
+
+@app.get("/datasets/{name}")
+def get_dataset(name: str):
+    """Get a dataset from the VectorDB.
+
+    Args:
+        name (str): Name of the target dataset.
+
+    Raises:
+        HTTPException: 404 Not Found if the dataset does not exist
+
+    Returns:
+        JSONResponse: Dataset details
+    """
+    try:
+        name = name.lower()
+        return database.get_dataset(name)
+    except database.DatasetDoesNotExistError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
 
