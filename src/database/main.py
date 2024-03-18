@@ -27,13 +27,6 @@ from llama_index.embeddings.openai import OpenAIEmbedding, OpenAIEmbeddingModelT
 from llama_index.llms.openai import OpenAI
 
 
-from llama_index.core.extractors import (
-    SummaryExtractor,
-    TitleExtractor,
-    KeywordExtractor,
-)
-
-
 def dataset_exists(name: str) -> bool:
     c = dbconn()
     n = f"data_{name}".lower()
@@ -160,13 +153,13 @@ async def ingest_documents(
 
     transformations = [
         TokenTextSplitter(separator=" ", chunk_size=512, chunk_overlap=128),
-        TitleExtractor(
-            nodes=5, llm=llm
-        ),  # assuming the title is located within the first 5 nodes ("pages")
-        SummaryExtractor(
-            summaries=["prev", "self"], llm=llm
-        ),  # extract summaries for previous and current node
-        KeywordExtractor(keywords=10, llm=llm),  # extract 10 keywords for each node
+        # TitleExtractor(
+        #     nodes=5, llm=llm
+        # ),  # assuming the title is located within the first 5 nodes ("pages")
+        # SummaryExtractor(
+        #     summaries=["prev", "self"], llm=llm
+        # ),  # extract summaries for previous and current node
+        # KeywordExtractor(keywords=10, llm=llm),  # extract 10 keywords for each node
     ]
 
     # Sanitization of documents - remove NUL (0x00) characters which are not allowed in Postgres/pgvector
@@ -184,7 +177,6 @@ async def ingest_documents(
             user=settings.db_user,
             password=settings.db_password,
             table_name="ingestion_cache",
-            debug=True,
         ),
     )
 
@@ -202,10 +194,15 @@ async def ingest_documents(
     nodes = await pipeline.arun(documents=documents, show_progress=False, num_workers=1)
     pipeline_duration = time.time() - pipeline_start_time
     log.info(
-        f"[dataset={dataset}] Ingestion pipeline took {pipeline_duration:.2f} seconds for {len(nodes)} nodes from {len(documents)} documents"
+        f"[dataset={dataset}] Transformations took {pipeline_duration:.2f} seconds for {len(nodes)} nodes from {len(documents)} documents"
     )
 
+    start = time.time()
     vector_store_index.insert_nodes(nodes)
+    end = time.time() - start
+    log.info(
+        f"[dataset={dataset}] Inserting {len(nodes)} nodes from {len(documents)} documents took {end:.2f} seconds"
+    )
 
     return nodes
 
