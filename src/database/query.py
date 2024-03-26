@@ -43,7 +43,7 @@ def query(
     embed_model = OpenAIEmbedding(
         model=embed_model_name,
         api_base=settings.api_base,
-        additional_kwargs={"encoding_format": "float"},
+        # additional_kwargs={"encoding_format": "float"},
     )
 
     vector_store_index = VectorStoreIndex.from_vector_store(

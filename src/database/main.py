@@ -129,7 +129,7 @@ async def ingest_documents(
     embed_model = OpenAIEmbedding(
         model=embed_model_name,
         api_base=settings.api_base,
-        additional_kwargs={"encoding_format": "float"},
+        # additional_kwargs={"encoding_format": "float"},
         # dimensions=vector_store.embed_dim, # FIXME: set dimensions only for models that support it
         # TODO: Set API parameters and allow for other embed_models to make it work with Rubra
         # - also allows specifying different modes for text search (current) or similarity search
