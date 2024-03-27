@@ -32,7 +32,7 @@ def dataset_exists(name: str) -> bool:
     n = f"data_{name}".lower()
     x = c.execute(
         text(
-            "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = :name)"
+            "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name=:name)"
         ),
         {"name": n},
     ).scalar()

@@ -21,7 +21,7 @@ if config.config_file_name is not None:
 
 config.set_main_option(
     "sqlalchemy.url",
-    f"postgresql+psycopg2://{settings.db_user}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_dbname}",
+    f"sqlite+aiosqlite:///{settings.db_file_path}?check_same_thread=False",
 )
 
 
