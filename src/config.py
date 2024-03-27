@@ -12,6 +12,9 @@ class Settings(BaseSettings):
 
     db_file_path: str = os.path.join(data_dir, "kra.db")
 
+    cache_dir: str = os.path.join(data_dir, "ingestion_cache")
+    cache_path: str = os.path.join(cache_dir, "cache")
+
     api_base: str = "http://localhost:8080/v1/"
 
     alembic_ini_path: str = os.path.join(config_dir, "alembic.ini")

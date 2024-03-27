@@ -20,6 +20,7 @@ from config import settings
 @asynccontextmanager
 async def lifespan(a: FastAPI):
     os.makedirs(settings.data_dir, exist_ok=True)
+    os.makedirs(settings.cache_dir, exist_ok=True)
     # DB Initialization & Migrations
     try:
         log.info("Running database migrations")
@@ -117,7 +118,6 @@ async def create_dataset(dataset: Dataset) -> Dataset:
         Dataset: Resulting dataset object
     """
     try:
-        print("Creating dataset")
         log.info(f"Creating dataset '{dataset.name}'")
         dataset.name = dataset.name.lower()
         database.create_dataset(dataset.name)  # TODO: take embed_dim as input
