@@ -10,7 +10,7 @@ from database.errors import (
     DatasetDoesNotExistError,
     FileDoesNotExistError,
 )
-from llama_index.vector_stores.postgres import PGVectorStore
+from llama_index.vector_stores.chroma import ChromaVectorStore
 
 
 from llama_index.core import Document
@@ -41,7 +41,7 @@ def dataset_exists(name: str) -> bool:
     return True
 
 
-def get_vector_store(name: str, embed_dim: int = 1536) -> PGVectorStore:
+def get_vector_store(name: str, embed_dim: int = 1536) -> ChromaVectorStore:
     """Get a VectorStore for the given dataset name and embedding dimension
 
     Args:
@@ -51,14 +51,10 @@ def get_vector_store(name: str, embed_dim: int = 1536) -> PGVectorStore:
     Returns:
         PGVectorStore: VectorStore for the given dataset name and embedding dimension
     """
-    return PGVectorStore.from_params(
-        host=settings.db_host,
-        port=str(settings.db_port),
-        database=settings.db_dbname,
-        user=settings.db_user,
-        password=settings.db_password,
+    return ChromaVectorStore.from_params(
+        collection_name=name,
         embed_dim=embed_dim,
-        table_name=name,
+        persist_dir=settings.vector_store_dir,
     )
 
 
@@ -78,9 +74,7 @@ def create_dataset(name: str, embed_dim: int = 1536):
         raise DatasetExistsError(name)
 
     # Initialize VectorStore for the dataset
-    vector_store = get_vector_store(name, embed_dim=embed_dim)
-    if isinstance(vector_store, PGVectorStore):
-        vector_store._initialize()
+    return get_vector_store(name, embed_dim=embed_dim)
 
 
 def delete_dataset(name: str):

@@ -13,14 +13,14 @@ from typing import Optional
 from log import log
 from contextlib import asynccontextmanager
 import logging
-import uvicorn
 from database.db import migrate
+from config import settings
 
 
 @asynccontextmanager
 async def lifespan(a: FastAPI):
+    os.makedirs(settings.data_dir, exist_ok=True)
     # DB Initialization & Migrations
-    # await database.init_db()
     try:
         log.info("Running database migrations")
         await migrate()
