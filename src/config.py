@@ -22,8 +22,6 @@ class Settings(BaseSettings):
 
     vector_store_dir: str = os.path.join(data_dir, "vector_store")
 
-    # get xdg data home
-
     debug: bool = False
 
     class Config:

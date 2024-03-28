@@ -1,4 +1,5 @@
 import os
+import time
 from fastapi import FastAPI, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -182,7 +183,11 @@ async def query(name: str, q: Query):
     try:
         name = name.lower()
         log.info(f"Querying dataset '{name}' with prompt: '{q.prompt}'")
+        start = time.time()
         results = database.query(prompt=q.prompt, dataset=name, topk=q.topk or 5)
+        log.info(
+            f"Querying dataset '{name}' with prompt '{q.prompt}' took {time.time() - start:.2f}s"
+        )
         return {"results": results}
     except database.DatasetDoesNotExistError as e:
         raise HTTPException(status_code=404, detail=str(e))
