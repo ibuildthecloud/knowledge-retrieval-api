@@ -1,3 +1,26 @@
+[build-system]
+requires = [
+    "setuptools>=61.0",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "knowledge-retrieval-api"
+version = "0.1.0"
+description = "Knowledge Retrieval for GPTStack"
+authors = [{name = "Thorsten Klein", email = "thorsten@acorn.io"}]
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
 [tool.ruff]
 extend-include = ["*.ipynb"]
+
 
