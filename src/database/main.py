@@ -10,7 +10,7 @@ from database.errors import (
     DatasetDoesNotExistError,
     FileDoesNotExistError,
 )
-from llama_index.vector_stores.chroma import ChromaVectorStore
+from llama_index.vector_stores.duckdb import DuckDBVectorStore
 
 
 from llama_index.core import Document
@@ -39,7 +39,7 @@ def dataset_exists(name: str) -> bool:
     return True
 
 
-def get_vector_store(name: str, embed_dim: int = 1536) -> ChromaVectorStore:
+def get_vector_store(name: str, embed_dim: int = 1536) -> DuckDBVectorStore:
     """Get a VectorStore for the given dataset name and embedding dimension
 
     Args:
@@ -47,13 +47,28 @@ def get_vector_store(name: str, embed_dim: int = 1536) -> ChromaVectorStore:
         embed_dim (int, optional): Embedding Dimension. Defaults to 1536, which is the OpenAI embedding dimension.
 
     Returns:
-        PGVectorStore: VectorStore for the given dataset name and embedding dimension
+        DuckDBVectorStore: VectorStore for the given dataset name and embedding dimension
     """
-    return ChromaVectorStore.from_params(
-        collection_name=name,
-        embed_dim=embed_dim,
+
+    dbname = name.lower() + ".db"
+    dbpath = os.path.join(settings.vector_store_dir, dbname)
+
+    if os.path.exists(dbpath):
+        return DuckDBVectorStore.from_local(
+            database_path=dbpath,
+            table_name="docs",
+        )
+
+    log.info("No VectorStore found. Creating a new one.")
+    db = DuckDBVectorStore.from_params(
         persist_dir=settings.vector_store_dir,
+        database_name=dbname,  # set to ":memory:" to use in-memory database
+        embed_dim=embed_dim,
+        table_name="docs",
     )
+    db._initialize()
+    db.persist(persist_path=dbpath)
+    return db
 
 
 def create_dataset(name: str, embed_dim: int = 1536):
