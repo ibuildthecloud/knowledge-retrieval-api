@@ -337,7 +337,7 @@ def get_dataset(name: str):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-if __name__ == "__main__":
+def main():
     import uvicorn
 
     uvicorn.run(
@@ -346,3 +346,7 @@ if __name__ == "__main__":
         port=8000,
         log_config=os.path.join(os.path.dirname(__file__), "log_conf.yaml"),
     )
+
+
+if __name__ == "__main__":
+    main()
