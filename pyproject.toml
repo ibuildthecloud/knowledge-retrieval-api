@@ -13,6 +13,14 @@ authors = [{name = "Thorsten Klein", email = "thorsten@acorn.io"}]
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
 dynamic = ["dependencies"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+[project.scripts]
+knowledge-retrieval-api = "knowledge_retrieval_api.main:main"
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
