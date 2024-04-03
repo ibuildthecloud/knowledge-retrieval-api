@@ -220,11 +220,18 @@ async def ingest_data(name: str, input_data: Ingest):
         # This could involve using OpenAI API for embedding and then storing in pgvector
         file_id = input_data.file_id if input_data.file_id else str(uuid.uuid4())
 
+        log.info(
+            f"Ingesting file id='{file_id}' content_length={len(input_data.content)} into dataset '{name}'"
+        )
+        start = time.time()
         ingested = await ingest.ingest_file(
             dataset=name,
             filename=input_data.filename,
             file_id=file_id,
             content=input_data.content,
+        )
+        log.info(
+            f"Ingesting file id='{file_id}' into dataset '{name}' took {time.time() - start:.2f}s"
         )
         return {
             "message": (
