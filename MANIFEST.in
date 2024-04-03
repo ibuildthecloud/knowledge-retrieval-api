@@ -1,0 +1,5 @@
+include requirements.txt
+include setup.cfg
+include tool.gpt
+include src/alembic.ini
+include src/log_conf.yaml

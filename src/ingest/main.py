@@ -1,9 +1,11 @@
+import time
 from typing import List, Optional
 from llama_index.core import SimpleDirectoryReader, Document
 import base64
 import tempfile
 import os
 
+from log import log
 from database import ingest_documents, get_session
 from database.models import FileIndex, DocumentIndex
 
@@ -55,7 +57,11 @@ async def ingest_file(
         file.write(file_content)
 
     # Load file
+    start = time.time()
     documents = load_file(path)
+    log.debug(
+        f"Loaded {len(documents)} documents from file {path} in {time.time() - start:.2f}s"
+    )
 
     # Sanitize metadata, since e.g. modification date is wrong, as it was just created as a temp file
     # and keeping this metadata will screw with the cache key calculation

@@ -27,8 +27,29 @@ loggers:
     handlers:
       - access
     propagate: no
-root:
-  level: INFO
-  handlers:
-    - default
-  propagate: no
+  root:
+    level: INFO
+    handlers:
+      - default
+    propagate: no
+  knowledge-retrieval-api:
+    level: DEBUG
+    handlers:
+      - default
+    propagate: no
+  sqlalchemy:
+    level: WARN
+    handlers:
+      - default
+    propagate: no
+  aiosqlite:
+    level: WARN
+    handlers:
+      - default
+    propagate: no
+  alembic:
+    level: INFO
+    handlers:
+      - default
+    propagate: no
+

@@ -1,3 +1,5 @@
+import os
+import time
 from fastapi import FastAPI, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -9,10 +11,29 @@ import ingest.main as ingest
 import traceback
 import uuid
 from typing import Optional
-from log import log
+from log import log, init_logging
+from contextlib import asynccontextmanager
+from database.db import migrate
+from config import settings
 
 
-app = FastAPI(title="Rubra - Knowledge Retrieval API")
+@asynccontextmanager
+async def lifespan(a: FastAPI):
+    init_logging()
+    os.makedirs(settings.data_dir, exist_ok=True)
+    os.makedirs(settings.cache_dir, exist_ok=True)
+    # DB Initialization & Migrations
+    try:
+        log.info("Running database migrations")
+        await migrate()
+    except Exception as e:
+        log.error(f"Database migration failed: {e}\n{traceback.format_exc()}")
+    log.info("Database migrations completed")
+    yield
+    # Shutdown
+
+
+app = FastAPI(title="Rubra - Knowledge Retrieval API", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
 
@@ -88,7 +109,7 @@ async def create_dataset(dataset: Dataset) -> Dataset:
     """Endpoint to create a new dataset in the VectorDB.
 
     Args:
-        name (str): Name of the dataset to create
+        dataset (str): Name of the dataset to create
 
     Raises:
         HTTPException: 409 Conflict if the dataset already exists
@@ -98,6 +119,7 @@ async def create_dataset(dataset: Dataset) -> Dataset:
         Dataset: Resulting dataset object
     """
     try:
+        log.info(f"Creating dataset '{dataset.name}'")
         dataset.name = dataset.name.lower()
         database.create_dataset(dataset.name)  # TODO: take embed_dim as input
         res = Dataset(name=dataset.name, embed_dim=1536)
@@ -161,7 +183,11 @@ async def query(name: str, q: Query):
     try:
         name = name.lower()
         log.info(f"Querying dataset '{name}' with prompt: '{q.prompt}'")
+        start = time.time()
         results = database.query(prompt=q.prompt, dataset=name, topk=q.topk or 5)
+        log.info(
+            f"Querying dataset '{name}' with prompt '{q.prompt}' took {time.time() - start:.2f}s"
+        )
         return {"results": results}
     except database.DatasetDoesNotExistError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -194,11 +220,18 @@ async def ingest_data(name: str, input_data: Ingest):
         # This could involve using OpenAI API for embedding and then storing in pgvector
         file_id = input_data.file_id if input_data.file_id else str(uuid.uuid4())
 
+        log.info(
+            f"Ingesting file id='{file_id}' content_length={len(input_data.content)} into dataset '{name}'"
+        )
+        start = time.time()
         ingested = await ingest.ingest_file(
             dataset=name,
             filename=input_data.filename,
             file_id=file_id,
             content=input_data.content,
+        )
+        log.info(
+            f"Ingested file id='{file_id}' into dataset '{name}' - took {time.time() - start:.2f}s"
         )
         return {
             "message": (
@@ -311,9 +344,17 @@ def get_dataset(name: str):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-if __name__ == "__main__":
+def main():
+    init_logging()
+
     import uvicorn
 
-    database.init_db()
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+    )
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+if __name__ == "__main__":
+    main()
