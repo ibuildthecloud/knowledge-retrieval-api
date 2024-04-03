@@ -162,3 +162,5 @@ cython_debug/
 # SQLite
 *.sqlite3
 *.db
+
+*.ipynb

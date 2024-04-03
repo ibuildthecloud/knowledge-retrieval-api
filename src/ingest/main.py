@@ -1,6 +1,7 @@
 import time
 from typing import List, Optional
 from llama_index.core import SimpleDirectoryReader, Document
+from llama_index.readers.file.pymu_pdf import PyMuPDFReader
 import base64
 import tempfile
 import os
@@ -111,6 +112,13 @@ async def ingest_file(
     }
 
 
+# Setting up a new file_extractor dict to replace some of the default readers with more performant ones
+pdf_reader = PyMuPDFReader()  # PyMuPDFReader is way faster than the default PDFReader
+
+file_extractor = SimpleDirectoryReader.supported_suffix_fn()
+file_extractor[".pdf"] = pdf_reader
+
+
 def load_file(path: str) -> List[Document]:
     """Load a document from a given path.
 
@@ -118,6 +126,8 @@ def load_file(path: str) -> List[Document]:
         path (str): Path to the document
 
     Returns:
-        Document: Document object
+        List[Document]: Document objects
     """
-    return SimpleDirectoryReader(input_files=[path]).load_data()
+    return SimpleDirectoryReader(
+        input_files=[path], file_extractor=file_extractor
+    ).load_data()

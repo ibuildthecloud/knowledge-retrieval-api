@@ -23,6 +23,7 @@ class QueryResponseSourceNode(BaseModel):
     last_modified_date: str
     document_title: str
     content: str
+    all_metadata: dict
 
 
 class QueryResponse(BaseModel):
@@ -72,13 +73,27 @@ def query(
             last_modified_date=node.metadata.get("last_modified_date", ""),
             document_title=node.metadata.get("document_title", ""),
             content=node.get_text(),
+            all_metadata={
+                k: v
+                for k, v in node.metadata.items()
+                if not k.startswith("_")
+                and k
+                not in [
+                    "excluded_embed_metadata_keys",
+                    "excluded_llm_metadata_keys",
+                    "relationships",
+                    "document_id",
+                    "doc_id",
+                    "ref_doc_id",
+                ]
+            },
         )
         for node in citation_response.source_nodes
     ]
 
     sources_txt = "\n".join(
         [
-            f"[{idx}] file={source.filename} page={source.page}]: {source.document_title}"
+            f"[Source #{idx}] filename='{source.filename}' metadata={source.all_metadata}"
             for idx, source in enumerate(sources)
         ]
     )
