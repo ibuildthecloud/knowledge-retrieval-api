@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     cache_dir: str = os.path.join(data_dir, "ingestion_cache")
     cache_path: str = os.path.join(cache_dir, "cache")
 
-    api_base: str = "http://localhost:8080/v1/"
+    api_base: str = "http://localhost:8080/v1"  # "https://api.openai.com/v1/"
 
     alembic_ini_path: str = os.path.join(config_dir, "alembic.ini")
     logging_conf_path: str = os.path.join(config_dir, "log_conf.yaml")
