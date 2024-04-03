@@ -59,7 +59,7 @@ def get_vector_store(name: str, embed_dim: int = 1536) -> DuckDBVectorStore:
             table_name="docs",
         )
 
-    log.info("No VectorStore found. Creating a new one.")
+    log.debug(f"No VectorStore found for dataset {name.lower()}. Creating a new one.")
     db = DuckDBVectorStore.from_params(
         persist_dir=settings.vector_store_dir,
         database_name=dbname,  # set to ":memory:" to use in-memory database

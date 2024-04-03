@@ -1,11 +1,10 @@
-from logging.config import fileConfig
-
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
 
 from config import settings
+from log import init_logging, log
 
 from database.db import Base
 
@@ -13,10 +12,7 @@ from database.db import Base
 # access to the values within the .ini file in use.
 config = context.config
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+init_logging()
 
 
 config.set_main_option(
@@ -74,7 +70,7 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
 
-    print(f"Running migrations on {connectable.url}")
+    log.info(f"Running migrations on {connectable.url}")
 
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)

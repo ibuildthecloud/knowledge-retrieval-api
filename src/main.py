@@ -11,15 +11,15 @@ import ingest.main as ingest
 import traceback
 import uuid
 from typing import Optional
-from log import log
+from log import log, init_logging
 from contextlib import asynccontextmanager
-import logging
 from database.db import migrate
 from config import settings
 
 
 @asynccontextmanager
 async def lifespan(a: FastAPI):
+    init_logging()
     os.makedirs(settings.data_dir, exist_ok=True)
     os.makedirs(settings.cache_dir, exist_ok=True)
     # DB Initialization & Migrations
@@ -27,7 +27,7 @@ async def lifespan(a: FastAPI):
         log.info("Running database migrations")
         await migrate()
     except Exception as e:
-        logging.error(f"Database migration failed: {e}\n{traceback.format_exc()}")
+        log.error(f"Database migration failed: {e}\n{traceback.format_exc()}")
     log.info("Database migrations completed")
     yield
     # Shutdown
@@ -231,7 +231,7 @@ async def ingest_data(name: str, input_data: Ingest):
             content=input_data.content,
         )
         log.info(
-            f"Ingesting file id='{file_id}' into dataset '{name}' took {time.time() - start:.2f}s"
+            f"Ingested file id='{file_id}' into dataset '{name}' - took {time.time() - start:.2f}s"
         )
         return {
             "message": (
@@ -345,13 +345,14 @@ def get_dataset(name: str):
 
 
 def main():
+    init_logging()
+
     import uvicorn
 
     uvicorn.run(
         app,
         host="0.0.0.0",
         port=8000,
-        log_config=os.path.join(os.path.dirname(__file__), "log_conf.yaml"),
     )
 
 
