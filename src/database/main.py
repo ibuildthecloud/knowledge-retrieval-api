@@ -170,7 +170,7 @@ async def ingest_documents(
         # KeywordExtractor(keywords=10, llm=llm),  # extract 10 keywords for each node
     ]
 
-    # Sanitization of documents - remove NUL (0x00) characters which are not allowed in Postgres/pgvector
+    # Sanitization of documents - remove NUL (0x00) characters which are not allowed in a few databases
     for doc in documents:
         doc.text = doc.text.replace("\x00", "")
 
@@ -191,12 +191,12 @@ async def ingest_documents(
     pipeline_start_time = time.time()
     nodes = await pipeline.arun(documents=documents, show_progress=False, num_workers=1)
     pipeline_duration = time.time() - pipeline_start_time
-    log.info(
+    log.debug(
         f"[dataset={dataset}] Transformations took {pipeline_duration:.2f} seconds for {len(nodes)} nodes from {len(documents)} documents"
     )
 
     start = time.time()
-    log.info(f"using api base {settings.api_base}")
+    log.debug(f"using api base {settings.api_base}")
     log.info(f"[dataset={dataset}] Inserting {len(nodes)} nodes into the VectorStore")
     vector_store_index.insert_nodes(nodes)
     end = time.time() - start

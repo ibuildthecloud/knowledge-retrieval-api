@@ -33,8 +33,12 @@ async def lifespan(a: FastAPI):
     # Shutdown
 
 
-app = FastAPI(title="Rubra - Knowledge Retrieval API", lifespan=lifespan)
-app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+app = FastAPI(title="GPTStudio - Knowledge Retrieval API", lifespan=lifespan)
+app.mount(
+    "/static",
+    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")),
+    name="static",
+)
 
 
 #
