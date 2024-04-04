@@ -34,7 +34,7 @@ async def lifespan(a: FastAPI):
 
 
 app = FastAPI(title="Rubra - Knowledge Retrieval API", lifespan=lifespan)
-app.mount("/static", StaticFiles(directory="src/static"), name="static")
+app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 
 
 #
@@ -352,7 +352,7 @@ def main():
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=8000,
+        port=int(os.environ.get("PORT", "8000")),
     )
 
 

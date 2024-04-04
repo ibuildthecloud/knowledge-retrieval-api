@@ -4,3 +4,9 @@ description: A tool that queries the knowledge retrieval API to get an answer to
 args: prompt: The query prompt to ask the vector database. URL Encoded string.
 
 #!http://${knowledge_retrieval_api_url}/datasets/${knowledge_retrieval_dataset}/query
+
+---
+name: server
+description: The knowledge server
+
+#!sys.daemon /usr/bin/env python3 ${GPTSCRIPT_TOOL_DIR}/src/main.py
