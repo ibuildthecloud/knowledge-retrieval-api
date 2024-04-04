@@ -9,4 +9,4 @@ args: prompt: The query prompt to ask the vector database. URL Encoded string.
 name: server
 description: The knowledge server
 
-#!sys.daemon /usr/bin/env python3 ${GPTSCRIPT_TOOL_DIR}/src/main.py
+#!sys.daemon /usr/bin/env python3.11 ${GPTSCRIPT_TOOL_DIR}/src/main.py
